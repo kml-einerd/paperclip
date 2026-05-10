@@ -89,6 +89,16 @@ import {
   agentConfigurationDoc as openclawGatewayAgentConfigurationDoc,
   models as openclawGatewayModels,
 } from "@paperclipai/adapter-openclaw-gateway";
+
+import {
+  execute as pmosGatewayExecute,
+  testEnvironment as pmosGatewayTestEnvironment,
+} from "@paperclipai/adapter-pmos-gateway/server";
+import {
+  agentConfigurationDoc as pmosGatewayAgentConfigurationDoc,
+  models as pmosGatewayModels,
+} from "@paperclipai/adapter-pmos-gateway";
+
 import { listCodexModels, refreshCodexModels } from "./codex-models.js";
 import { listCursorModels } from "./cursor-models.js";
 import {
@@ -323,6 +333,18 @@ const geminiLocalAdapter: ServerAdapterModule = {
   agentConfigurationDoc: geminiAgentConfigurationDoc,
 };
 
+
+const pmosGatewayAdapter: ServerAdapterModule = {
+  type: "pmos_gateway",
+  execute: pmosGatewayExecute,
+  testEnvironment: pmosGatewayTestEnvironment,
+  models: pmosGatewayModels,
+  supportsLocalAgentJwt: false,
+  supportsInstructionsBundle: false,
+  requiresMaterializedRuntimeSkills: false,
+  agentConfigurationDoc: pmosGatewayAgentConfigurationDoc,
+};
+
 const openclawGatewayAdapter: ServerAdapterModule = {
   type: "openclaw_gateway",
   execute: openclawGatewayExecute,
@@ -460,6 +482,7 @@ function registerBuiltInAdapters() {
     cursorLocalAdapter,
     geminiLocalAdapter,
     openclawGatewayAdapter,
+    pmosGatewayAdapter,
     hermesLocalAdapter,
     processAdapter,
     httpAdapter,
