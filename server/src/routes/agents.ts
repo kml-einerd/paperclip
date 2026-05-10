@@ -863,11 +863,19 @@ export function agentRoutes(
     return Number.isFinite(parsed) ? parsed : null;
   }
 
+  function resolveHeartbeatIntervalSec(heartbeat: Record<string, unknown>): number {
+    const sec = parseNumberLike(heartbeat.intervalSec);
+    if (sec != null && sec > 0) return Math.max(0, sec);
+    const minutes = parseNumberLike(heartbeat.intervalMinutes);
+    if (minutes != null && minutes > 0) return Math.max(0, Math.floor(minutes * 60));
+    return Math.max(0, sec ?? 0);
+  }
+
   function parseSchedulerHeartbeatPolicy(runtimeConfig: unknown) {
     const heartbeat = asRecord(asRecord(runtimeConfig)?.heartbeat) ?? {};
     return {
       enabled: parseBooleanLike(heartbeat.enabled) ?? false,
-      intervalSec: Math.max(0, parseNumberLike(heartbeat.intervalSec) ?? 0),
+      intervalSec: resolveHeartbeatIntervalSec(heartbeat),
     };
   }
 
@@ -882,6 +890,12 @@ export function agentRoutes(
     }
     if (parseNumberLike(heartbeat.maxConcurrentRuns) == null) {
       heartbeat.maxConcurrentRuns = AGENT_DEFAULT_MAX_CONCURRENT_RUNS;
+    }
+    const explicitSec = parseNumberLike(heartbeat.intervalSec);
+    const legacyMinutes = parseNumberLike(heartbeat.intervalMinutes);
+    if ((explicitSec == null || explicitSec <= 0) && legacyMinutes != null && legacyMinutes > 0) {
+      heartbeat.intervalSec = Math.floor(legacyMinutes * 60);
+      delete heartbeat.intervalMinutes;
     }
 
     normalizedRuntimeConfig.heartbeat = heartbeat;

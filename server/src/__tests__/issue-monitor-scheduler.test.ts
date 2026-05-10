@@ -447,4 +447,54 @@ describeEmbeddedPostgres("issue monitor scheduler", () => {
     expect(JSON.stringify(activity.map((row) => row.details))).not.toContain("provider.example");
     expect(activity.find((row) => row.action === "issue.monitor_triggered")?.details).not.toHaveProperty("externalRef");
   });
+
+  it("dispatches heartbeat_timer wakeup when only legacy intervalMinutes is configured (GH #420)", async () => {
+    const companyId = randomUUID();
+    const agentId = randomUUID();
+    const issuePrefix = `T${companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+    const lastHeartbeatAt = new Date("2026-04-11T12:00:00.000Z");
+    const tickAt = new Date("2026-04-11T12:31:00.000Z");
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix,
+      requireBoardApprovalForNewAgents: false,
+    });
+
+    await db.insert(agents).values({
+      id: agentId,
+      companyId,
+      name: "Legacy Heartbeat Bot",
+      role: "engineer",
+      status: "active",
+      adapterType: "process",
+      adapterConfig: {
+        command: process.execPath,
+        args: ["-e", ""],
+        cwd: process.cwd(),
+      },
+      runtimeConfig: {
+        heartbeat: {
+          enabled: true,
+          intervalMinutes: 30,
+          wakeOnDemand: true,
+        },
+      },
+      permissions: {},
+      lastHeartbeatAt,
+    });
+    seededAgentIds.add(agentId);
+
+    const heartbeat = heartbeatService(db);
+    const result = await heartbeat.tickTimers(tickAt);
+
+    expect(result.enqueued).toBeGreaterThanOrEqual(1);
+
+    const wakeups = await db
+      .select()
+      .from(agentWakeupRequests)
+      .where(eq(agentWakeupRequests.agentId, agentId));
+    expect(wakeups.some((row) => row.reason === "heartbeat_timer")).toBe(true);
+  });
 });

@@ -5709,13 +5709,21 @@ export function heartbeatService(db: Db, options: HeartbeatServiceOptions = {}) 
     };
   }
 
+  function resolveHeartbeatIntervalSec(heartbeat: Record<string, unknown>): number {
+    const sec = asNumber(heartbeat.intervalSec, 0);
+    if (sec > 0) return Math.max(0, sec);
+    const minutes = asNumber(heartbeat.intervalMinutes, 0);
+    if (minutes > 0) return Math.max(0, Math.floor(minutes * 60));
+    return Math.max(0, sec);
+  }
+
   function parseHeartbeatPolicy(agent: typeof agents.$inferSelect) {
     const runtimeConfig = parseObject(agent.runtimeConfig);
     const heartbeat = parseObject(runtimeConfig.heartbeat);
 
     return {
       enabled: asBoolean(heartbeat.enabled, false),
-      intervalSec: Math.max(0, asNumber(heartbeat.intervalSec, 0)),
+      intervalSec: resolveHeartbeatIntervalSec(heartbeat),
       wakeOnDemand: asBoolean(heartbeat.wakeOnDemand ?? heartbeat.wakeOnAssignment ?? heartbeat.wakeOnOnDemand ?? heartbeat.wakeOnAutomation, true),
       maxConcurrentRuns: normalizeMaxConcurrentRuns(heartbeat.maxConcurrentRuns),
     };
