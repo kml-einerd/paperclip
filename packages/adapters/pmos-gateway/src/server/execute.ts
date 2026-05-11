@@ -82,23 +82,17 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     return { exitCode: 1, signal: null, timedOut: false, errorMessage: msg };
   }
 
-  await ctx.onLog(
-    "stdout",
-    `[pmos-gateway] Dispatch payload: ${JSON.stringify({
-      recipe: dispatch.recipe ?? null,
-      intent: dispatch.intent ? "<present>" : null,
-      params: dispatch.params ? Object.keys(dispatch.params) : null,
-    })}\n`,
-  );
-
-  const body = {
-    ...dispatch,
-    paperclip_ctx: {
-      runId: ctx.runId,
-      agentId: ctx.agent?.id,
-      issueId: typeof issueId === "string" ? issueId : null,
-    },
+  const body: any = {
+    context: (ctx as any).workspace?.env || {},
+    paperclip_ctx: { runId: ctx.runId, agentId: ctx.agent?.id },
   };
+
+  if (dispatch.recipe) {
+    body.recipe = dispatch.recipe;
+    if (dispatch.params) body.params = dispatch.params;
+  } else {
+    body.intent = dispatch.intent;
+  }
 
   try {
     const runRes = await fetch(`${url}/api/v2/run`, {
