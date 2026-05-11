@@ -120,7 +120,7 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
       requireEmailVerification: false,
       disableSignUp: config.authDisableSignUp,
     },
-    advanced: buildBetterAuthAdvancedOptions({ disableSecureCookies: isHttpOnly }),
+    advanced: buildBetterAuthAdvancedOptions({ disableSecureCookies: true }),
   };
 
   if (!baseUrl) {

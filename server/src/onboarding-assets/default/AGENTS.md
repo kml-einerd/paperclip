@@ -15,3 +15,13 @@ You are an agent at Paperclip company.
 - Respect budget, pause/cancel, approval gates, and company boundaries.
 
 Do not let work sit here. You must always update your task with a comment.
+
+
+---
+### REGRAS DA ARQUITETURA UNIFICADA (PM-OS sobre Nova Era)
+Para operar corretamente neste workspace, todo agente DEVE obedecer a estas 3 leis fundamentais (ADR-026):
+
+1. **GitHub é a ÚNICA Fonte da Verdade (SSOT):** O Paperclip sincroniza suas issues locais com o GitHub via scripts em background. Se você criar ou atualizar uma issue/tarefa, atualize o contexto localmente mas lembre-se que o GitHub é o repositório oficial de estado.
+2. **O Data Lake é o Google Drive (Não o Git):** Materiais pesados como Áudio, Vídeo, PDFs gigantes ou Imagens NÃO devem ser salvos (commitados) no repositório Git. Jogue-os no Google Drive e utilize o PM-OS (recipe: brain-consolidation) para processar o material em um resumo Markdown na pasta memory/.
+3. **PM-OS é o Motor de Execução (O Músculo):** Quando se deparar com uma tarefa massiva, complexa ou repetitiva (que exija padronização de output ou transcrição pesada), NÃO tente resolvê-la localmente com bash. Despache uma recipe para o PM-OS utilizando o adaptador `pmos-gateway`.
+---

@@ -1,5 +1,5 @@
 export const type = "pmos_gateway";
-export const label = "Pmos Gateway";
+export const label = "PM-OS Gateway";
 
 export const models: { id: string; label: string }[] = [];
 
@@ -8,48 +8,23 @@ export const agentConfigurationDoc = `# pmos_gateway agent configuration
 Adapter: pmos_gateway
 
 Use when:
-- You want Paperclip to invoke Pmos over the Gateway WebSocket protocol.
-- You want native gateway auth/connect semantics instead of HTTP /v1/responses or /hooks/*.
+- You want Paperclip to delegate complex/repetitive tasks to PM-OS recipes.
+- You need deterministic DAG-based parallel execution with quality gates.
+- Processing audio transcription, batch content, multi-step workflows.
 
 Don't use when:
-- You only expose Pmos HTTP endpoints.
-- Your deployment does not permit outbound WebSocket access from the Paperclip server.
+- The task is exploratory / creative (use claude_local or gemini_local).
+- The task is a simple one-shot question (use a coding agent directly).
 
 Core fields:
-- url (string, required): Pmos gateway WebSocket URL (ws:// or wss://)
-- headers (object, optional): handshake headers; supports x-pmos-token / x-pmos-auth
-- authToken (string, optional): shared gateway token override
-- password (string, optional): gateway shared password, if configured
+- url (string, required): PM-OS API base URL (e.g. http://localhost:8080)
+- apiKey (string, required): PM-OS API key (X-Api-Key header)
+- paperclipApiUrl (string, optional): Paperclip API URL for issue metadata lookup
 
-Gateway connect identity fields:
-- clientId (string, optional): gateway client id (default gateway-client)
-- clientMode (string, optional): gateway client mode (default backend)
-- clientVersion (string, optional): client version string
-- role (string, optional): gateway role (default operator)
-- scopes (string[] | comma string, optional): gateway scopes (default ["operator.admin"])
-- disableDeviceAuth (boolean, optional): disable signed device payload in connect params (default false)
+Routing (how the adapter picks what to execute):
+1. issue.metadata.recipe + issue.metadata.params (per-issue routing via Paperclip)
+2. adapterConfig.recipe + adapterConfig.params (per-agent default recipe)
+3. adapterConfig.intent OR adapterConfig.promptTemplate (Morgan ad-hoc planning)
 
-Request behavior fields:
-- payloadTemplate (object, optional): additional fields merged into gateway agent params
-- workspaceRuntime (object, optional): reserved workspace runtime metadata; workspace runtime services are manually controlled from the workspace UI and are not auto-started by heartbeats
-- timeoutSec (number, optional): adapter timeout in seconds (default 120)
-- waitTimeoutMs (number, optional): agent.wait timeout override (default timeoutSec * 1000)
-- autoPairOnFirstConnect (boolean, optional): on first "pairing required", attempt device.pair.list/device.pair.approve via shared auth, then retry once (default true)
-- paperclipApiUrl (string, optional): absolute Paperclip base URL advertised in wake text
-- claimedApiKeyPath (string, optional): path to the claimed API key JSON file read by the agent at wake time (default ~/.pmos/workspace/paperclip-claimed-api-key.json)
-
-Session routing fields:
-- sessionKeyStrategy (string, optional): issue (default), fixed, or run
-- sessionKey (string, optional): fixed session key when strategy=fixed (default paperclip)
-
-Standard outbound payload additions:
-- paperclip (object): standardized Paperclip context added to every gateway agent request
-- paperclip.workspace (object, optional): resolved execution workspace for this run
-- paperclip.workspaces (array, optional): additional workspace hints Paperclip exposed to the run
-- paperclip.workspaceRuntime (object, optional): reserved workspace runtime metadata when explicitly supplied outside normal heartbeat execution
-
-Standard result metadata supported:
-- meta.runtimeServices (array, optional): normalized adapter-managed runtime service reports
-- meta.previewUrl (string, optional): shorthand single preview URL
-- meta.previewUrls (string[], optional): shorthand multiple preview URLs
+The adapter polls PM-OS run status every 2s until completion or failure.
 `;
