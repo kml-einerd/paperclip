@@ -288,19 +288,24 @@ function livenessRecoveryLeafKey(companyId: string, state: string, leafIssueId: 
   return buildIssueGraphLivenessLeafKey({ companyId, state, leafIssueId });
 }
 
-function isUniqueLivenessRecoveryConflict(error: unknown) {
+function isUniqueConstraintViolation(error: unknown, ...constraintNames: string[]): boolean {
   if (!error || typeof error !== "object") return false;
-  const maybe = error as { code?: string; constraint?: string; message?: string };
-  return maybe.code === "23505" &&
-    (
-      maybe.constraint === "issues_active_liveness_recovery_incident_uq" ||
-      maybe.constraint === "issues_active_liveness_recovery_leaf_uq" ||
-      typeof maybe.message === "string" &&
-        (
-          maybe.message.includes("issues_active_liveness_recovery_incident_uq") ||
-          maybe.message.includes("issues_active_liveness_recovery_leaf_uq")
-        )
-    );
+  const maybe = error as { code?: string; constraint?: string; message?: string; cause?: unknown };
+  if (maybe.code === "23505") {
+    if (maybe.constraint && constraintNames.includes(maybe.constraint)) return true;
+    if (typeof maybe.message === "string" && constraintNames.some(n => maybe.message!.includes(n))) return true;
+  }
+  // DrizzleQueryError wraps the PG error in .cause
+  if (maybe.cause) return isUniqueConstraintViolation(maybe.cause, ...constraintNames);
+  return false;
+}
+
+function isUniqueLivenessRecoveryConflict(error: unknown) {
+  return isUniqueConstraintViolation(
+    error,
+    "issues_active_liveness_recovery_incident_uq",
+    "issues_active_liveness_recovery_leaf_uq",
+  );
 }
 
 function formatDependencyPath(finding: IssueLivenessFinding) {
@@ -928,23 +933,11 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
   }
 
   function isUniqueStaleRunEvaluationConflict(error: unknown) {
-    if (!error || typeof error !== "object") return false;
-    const maybe = error as { code?: string; constraint?: string; message?: string };
-    return maybe.code === "23505" &&
-      (
-        maybe.constraint === "issues_active_stale_run_evaluation_uq" ||
-        typeof maybe.message === "string" && maybe.message.includes("issues_active_stale_run_evaluation_uq")
-      );
+    return isUniqueConstraintViolation(error, "issues_active_stale_run_evaluation_uq");
   }
 
   function isUniqueStrandedIssueRecoveryConflict(error: unknown) {
-    if (!error || typeof error !== "object") return false;
-    const maybe = error as { code?: string; constraint?: string; message?: string };
-    return maybe.code === "23505" &&
-      (
-        maybe.constraint === "issues_active_stranded_issue_recovery_uq" ||
-        typeof maybe.message === "string" && maybe.message.includes("issues_active_stranded_issue_recovery_uq")
-      );
+    return isUniqueConstraintViolation(error, "issues_active_stranded_issue_recovery_uq");
   }
 
   async function ensureSourceIssueBlockedByStaleEvaluation(input: {

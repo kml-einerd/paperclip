@@ -754,6 +754,24 @@ export async function migratePostgresIfEmpty(url: string): Promise<MigrationBoot
   }
 }
 
+async function waitForPostgresReady(url: string, maxAttempts = 20, baseDelayMs = 250): Promise<void> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const sql = createUtilitySql(url);
+    try {
+      await sql`select 1`;
+      await sql.end();
+      return;
+    } catch (err) {
+      await sql.end({ timeout: 1 }).catch(() => {});
+      const isConnRefused =
+        err instanceof Error &&
+        (err.message.includes("ECONNREFUSED") || err.message.includes("CONNECT_TIMEOUT") || err.message.includes("connect"));
+      if (!isConnRefused || attempt === maxAttempts - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, baseDelayMs * Math.min(Math.pow(2, attempt), 8)));
+    }
+  }
+}
+
 export async function ensurePostgresDatabase(
   url: string,
   databaseName: string,
@@ -761,6 +779,8 @@ export async function ensurePostgresDatabase(
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(databaseName)) {
     throw new Error(`Unsafe database name: ${databaseName}`);
   }
+
+  await waitForPostgresReady(url);
 
   const sql = createUtilitySql(url);
   try {
