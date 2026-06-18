@@ -10,6 +10,7 @@ The guide is not itself a template — copy the section outline below into your 
 
 Every new-role `AGENTS.md` should cover these sections in order. Remove a section only if you can justify why the role does not need it.
 
+0. **Núcleo de raciocínio (obrigatório, sempre primeiro)** — cole o conteúdo de `references/reasoning-core.md` no TOPO do `AGENTS.md`, ANTES da identidade. É o mesmo bloco para todo agente: rege COMO o agente raciocina (caminho-duplo, epistemics calibrada, auto-verificação, altitude/escalação, contrato Paperclip 409/checkout/heartbeat). Não reescreva nem resuma — cole verbatim, com o marcador `<!-- reasoning-core v1 -->`. As seções 1–8 abaixo regem o QUÊ (identidade, lentes, output do papel); o core nunca as substitui — sua primeira frase já estabelece que "a regra de papel mais específica vence". Nunca deixe o core achatar a identidade, as lentes ou o contrato de output do papel.
 1. Identity and reporting line
 2. Role charter
 3. Operating workflow
@@ -127,9 +128,13 @@ How the agent verifies its own work before marking an issue done or handing it t
 
 ## Minimal scaffold
 
-Copy this scaffold into your draft and fill each section. Delete the comments (`<!-- -->`) once each section is specific.
+Copy this scaffold into your draft and fill each section. Delete the comments (`<!-- -->`) once each section is specific. O scaffold ABRE com o núcleo de raciocínio (colado de `references/reasoning-core.md`) e só então entra a identidade do papel.
 
 ```md
+<!-- COLE AQUI, verbatim, todo o conteúdo de references/reasoning-core.md
+     (começa com "<!-- reasoning-core v1 -->" e a seção "## Núcleo de raciocínio").
+     É o primeiro bloco do arquivo, antes da identidade abaixo. -->
+
 You are agent {{agentName}} ({{roleTitle}}) at {{companyName}}.
 
 When you wake up, follow the Paperclip skill. It contains the full heartbeat procedure.

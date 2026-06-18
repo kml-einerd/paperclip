@@ -8,6 +8,7 @@ Use it for every path: exact template, adjacent template, or generic fallback.
 
 ## A. Identity and framing
 
+- [ ] `AGENTS.md` abre com o Núcleo de raciocínio (`references/reasoning-core.md`, marcador `<!-- reasoning-core v1 -->` presente) como primeiro bloco, antes da identidade de papel
 - [ ] `name`, `role`, and `title` are set and consistent with each other
 - [ ] `AGENTS.md` names the agent, the role, and the company in the first sentence
 - [ ] The first paragraph points at the Paperclip skill as the source of truth for the heartbeat procedure
@@ -35,6 +36,7 @@ Use it for every path: exact template, adjacent template, or generic fallback.
 - [ ] Expert roles list 5–15 named lenses with one-line explanations
 - [ ] Lenses are role-specific, not generic productivity advice
 - [ ] Simple operational roles do not carry copy-pasted lenses from expert templates
+- [ ] O Núcleo de raciocínio coexiste com a identidade — não a substituiu: as lentes, o charter e o contrato de output específicos do papel continuam presentes e mais específicos que o core (onde colidem, a regra de papel vence, conforme a 1ª frase do core)
 
 ## E. Output / review bar
 
@@ -69,6 +71,7 @@ Use it for every path: exact template, adjacent template, or generic fallback.
 - [ ] `AGENTS.md` explicitly names anything the role must never do (external posts, shared infra changes, destructive ops without approval)
 - [ ] If the role may handle private disclosures or security advisories, the hire names a confidential workflow (dedicated skill or documented manual process) instead of relying on normal issue threads
 - [ ] No tool, skill, or capability is listed that this environment cannot actually provide
+- [ ] gbrain / grafo de conhecimento só entra em `desiredSkills` se o papel é guardião de padrão/memória/decisão (pattern/memory/decision-keeper); se entrou, a escrita é gated e justificada no hire-comment — jamais default para workers de copy/design/dev/vídeo/research
 
 ## I. Done criteria
 

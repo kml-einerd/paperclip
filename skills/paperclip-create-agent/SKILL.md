@@ -64,6 +64,8 @@ Generic fallback for no-template hires:
 
 State which path you took in your hire-request comment so the board can see the reasoning.
 
+**Núcleo de raciocínio (obrigatório, vale para os TRÊS caminhos).** Seja qual for o path acima, o `AGENTS.md` final SEMPRE abre com o conteúdo de `references/reasoning-core.md` colado verbatim no topo (com o marcador `<!-- reasoning-core v1 -->`), ANTES da identidade do papel. O core dá ao agente a capacidade de raciocínio comum (caminho-duplo sem travar, epistemics calibrada sem confabular, auto-verificação antes de agir, altitude/escalação, contrato Paperclip 409/checkout/heartbeat); o conteúdo específico do papel (template ou baseline) entra logo depois. A primeira frase do core garante que "a regra de papel mais específica vence" — então colar o core nunca achata a identidade, as lentes ou o contrato de output do papel.
+
 ### 5. Discover allowed agent icons
 
 ```sh
@@ -73,11 +75,13 @@ curl -sS "$PAPERCLIP_API_URL/llms/agent-icons.txt" \
 
 ### 6. Draft the new hire config
 
+- **`AGENTS.md` abre com `references/reasoning-core.md` colado verbatim (marcador `<!-- reasoning-core v1 -->`) como primeiro bloco, antes da identidade — obrigatório para exact/adjacent/generic**
 - role / title / name
 - icon (required in practice; pick from `/llms/agent-icons.txt`)
 - reporting line (`reportsTo`)
 - adapter type
 - `desiredSkills` from the company skill library when this role needs installed skills on day one
+- **gbrain / grafo de conhecimento (opcional, por role-fit — nunca default):** só adicione o MCP `gbrain` aos `desiredSkills` quando o papel é guardião de padrão/memória/decisão (ex.: pattern-mapper, ops-coo, ops-depurator, arquiteto) — papéis que consultam ou mantêm conhecimento estruturado. Para workers de copy/design/dev/vídeo/research, gbrain é ruído que queima contexto e abre superfície de escrita não-auditada num agente que nunca deveria mutar grafo de conhecimento. Quando adicionar, mantenha a escrita gated e justifique no hire-comment (seção H da checklist). O reasoning-core já instrui "consulte o brain/grafo antes de afirmar" de forma agnóstica a tool — então a capacidade de consulta vale para qualquer brain (arquivo, ak-vault, grafo) sem precisar do gbrain.
 - if any `desiredSkills` or adapter settings expand browser access, external-system reach, filesystem scope, or secret-handling capability, justify each one in the hire comment
 - adapter and runtime config aligned to this environment
 - leave timer heartbeats off by default; only set `runtimeConfig.heartbeat.enabled=true` with an `intervalSec` when the role genuinely needs scheduled recurring work or the user explicitly asked for it

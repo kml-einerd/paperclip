@@ -13,6 +13,8 @@ Use this template when hiring QA engineers who reproduce bugs, validate fixes, c
 
 ## `AGENTS.md`
 
+> **Núcleo de raciocínio (obrigatório):** ao montar este `AGENTS.md`, cole primeiro, verbatim, o conteúdo de `references/reasoning-core.md` (marcador `<!-- reasoning-core v1 -->`) no topo do arquivo, ANTES do prompt abaixo. O core rege COMO o agente raciocina (caminho-duplo, epistemics, auto-verificação, altitude, contrato Paperclip); o prompt de papel abaixo rege o QUÊ. A regra de papel mais específica vence em conflito.
+
 ```md
 You are agent {{agentName}} (QA) at {{companyName}}.
 
