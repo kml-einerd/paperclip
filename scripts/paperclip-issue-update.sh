@@ -102,9 +102,28 @@ if [[ -z "${PAPERCLIP_API_URL:-}" || -z "${PAPERCLIP_API_KEY:-}" || -z "${PAPERC
   exit 1
 fi
 
-curl -sS -X PATCH \
+response="$(curl -sS -w '\n%{http_code}' -X PATCH \
   "$PAPERCLIP_API_URL/api/issues/$issue_id" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" \
   -H 'Content-Type: application/json' \
-  --data-binary "$payload"
+  --data-binary "$payload")"
+
+http_code="$(printf '%s' "$response" | tail -n1)"
+body="$(printf '%s' "$response" | head -n -1)"
+
+printf '%s\n' "$body"
+
+if [[ "$http_code" == "422" ]]; then
+  error_msg="$(printf '%s' "$body" | jq -r '.error // "unknown"' 2>/dev/null || true)"
+  printf '\n[paperclip-issue-update] 422 deterministic error — not retrying: %s\n' "$error_msg" >&2
+  printf '[paperclip-issue-update] Issue id: %s, requested status: %s\n' "$issue_id" "$status" >&2
+  # Exit 0 to avoid breaking the caller heartbeat; the error is logged to stderr.
+  # The server-side auto-block mechanism will converge the issue state on next access.
+  exit 0
+fi
+
+if [[ "$http_code" -ge 400 ]]; then
+  printf '\n[paperclip-issue-update] HTTP %s error for issue %s\n' "$http_code" "$issue_id" >&2
+  exit 1
+fi

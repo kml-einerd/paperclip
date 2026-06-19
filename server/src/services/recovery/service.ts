@@ -1875,6 +1875,27 @@ export function recoveryService(db: Db, deps: { enqueueWakeup: RecoveryWakeup })
         continue;
       }
 
+      // Early-exit: if the issue is in_progress but has unresolved first-class blockers,
+      // it can never transition to in_progress via checkout or PATCH — skip recovery
+      // and move it to blocked so the assignee is not woken into a 422 retry loop.
+      if (issue.status === "in_progress") {
+        const unresolvedBlockerIds = await existingUnresolvedBlockerIssueIds(issue.companyId, issue.id);
+        if (unresolvedBlockerIds.length > 0) {
+          const autoBlocked = await issuesSvc.update(issue.id, {
+            status: "blocked",
+            blockedByIssueIds: unresolvedBlockerIds,
+          });
+          if (autoBlocked) {
+            logger.warn(
+              { issueId: issue.id, companyId: issue.companyId, unresolvedBlockerIds },
+              "recovery: auto-blocked in_progress issue with unresolved first-class blockers — skipping stranded recovery to prevent 422 retry loop",
+            );
+          }
+          result.skipped += 1;
+          continue;
+        }
+      }
+
       if (!latestRun && !issue.checkoutRunId && !issue.executionRunId) {
         result.skipped += 1;
         continue;

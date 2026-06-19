@@ -2791,6 +2791,36 @@ export function issueRoutes(
           },
           "issue update rejected with 422",
         );
+
+        // Auto-block: when a caller blindly retries PATCH {status:"in_progress"} on an
+        // issue that has unresolved first-class blockers, converge the state server-side
+        // instead of letting the caller loop. Move the issue to `blocked` and respond
+        // with 200 so the caller stops retrying (a 422 loop is non-actionable for agents).
+        if (
+          err.message === "Issue is blocked by unresolved blockers" &&
+          req.body.status === "in_progress" &&
+          Array.isArray(err.details?.unresolvedBlockerIssueIds) &&
+          (err.details.unresolvedBlockerIssueIds as string[]).length > 0
+        ) {
+          const autoBlocked = await svc.update(id, {
+            status: "blocked",
+            blockedByIssueIds: err.details.unresolvedBlockerIssueIds as string[],
+            actorAgentId: actor.agentId ?? null,
+            actorUserId: actor.actorType === "user" ? actor.actorId : null,
+          });
+          if (autoBlocked) {
+            logger.warn(
+              {
+                issueId: id,
+                companyId: existing.companyId,
+                unresolvedBlockerIssueIds: err.details.unresolvedBlockerIssueIds,
+              },
+              "auto-blocked issue after repeated in_progress 422 — caller was retrying blindly",
+            );
+            res.json(autoBlocked);
+            return;
+          }
+        }
       }
       throw err;
     }
@@ -3465,7 +3495,47 @@ export function issueRoutes(
 
     const checkoutRunId = requireAgentRunId(req, res);
     if (req.actor.type === "agent" && !checkoutRunId) return;
-    const updated = await svc.checkout(id, req.body.agentId, req.body.expectedStatuses, checkoutRunId);
+
+    let updated;
+    try {
+      updated = await svc.checkout(id, req.body.agentId, req.body.expectedStatuses, checkoutRunId);
+    } catch (err) {
+      // Auto-block on checkout: when checkout is rejected because the issue has
+      // unresolved first-class blockers, converge the state server-side so the
+      // caller stops retrying on the next heartbeat wake.
+      if (
+        err instanceof HttpError &&
+        err.status === 422 &&
+        err.message === "Issue is blocked by unresolved blockers" &&
+        Array.isArray(err.details?.unresolvedBlockerIssueIds) &&
+        (err.details.unresolvedBlockerIssueIds as string[]).length > 0
+      ) {
+        const autoBlocked = await svc.update(issue.id, {
+          status: "blocked",
+          blockedByIssueIds: err.details.unresolvedBlockerIssueIds as string[],
+          actorAgentId: null,
+          actorUserId: null,
+        });
+        if (autoBlocked) {
+          logger.warn(
+            {
+              issueId: issue.id,
+              companyId: issue.companyId,
+              agentId: req.body.agentId,
+              unresolvedBlockerIssueIds: err.details.unresolvedBlockerIssueIds,
+            },
+            "auto-blocked issue on checkout — issue had unresolved blockers preventing in_progress transition",
+          );
+          res.status(409).json({
+            error: "Issue is blocked by unresolved blockers",
+            blockedByIssueIds: err.details.unresolvedBlockerIssueIds,
+            issue: autoBlocked,
+          });
+          return;
+        }
+      }
+      throw err;
+    }
     const actor = getActorInfo(req);
 
     await logActivity(db, {
