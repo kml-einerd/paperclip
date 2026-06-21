@@ -21,6 +21,7 @@ export {
   runDatabaseBackup,
   runDatabaseRestore,
   formatDatabaseBackupResult,
+  pruneOldBackups,
   type BackupRetentionPolicy,
   type RunDatabaseBackupOptions,
   type RunDatabaseBackupResult,
@@ -30,6 +31,18 @@ export {
   createEmbeddedPostgresLogBuffer,
   formatEmbeddedPostgresError,
 } from "./embedded-postgres-error.js";
+export {
+  ensureLinuxSharedLibraryAliases,
+  prepareEmbeddedPostgresNativeRuntime,
+  resolveEmbeddedPostgresBinPath,
+} from "./embedded-postgres-native.js";
+export {
+  cleanStopEmbeddedPostgres,
+  cleanupOrphanSharedMemoryOnStart,
+  parseOrphanSharedMemory,
+  removeOrphanSharedMemory,
+  type OrphanSharedMemory,
+} from "./embedded-postgres-shutdown.js";
 export { issueRelations } from "./schema/issue_relations.js";
 export { issueReferenceMentions } from "./schema/issue_reference_mentions.js";
 export * from "./schema/index.js";

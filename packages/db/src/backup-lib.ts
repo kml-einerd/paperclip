@@ -8,10 +8,20 @@ import { createGunzip, createGzip } from "node:zlib";
 import postgres from "postgres";
 
 export type BackupRetentionPolicy = {
+  /** Keep EVERY backup within the last `hourlyHours` hours. Defaults to 48 when omitted. */
+  hourlyHours?: number;
+  /** Keep the newest backup per calendar day for `dailyDays` days. */
   dailyDays: number;
+  /** Keep the newest backup per calendar week for `weeklyWeeks` weeks. */
   weeklyWeeks: number;
+  /** Keep the newest backup per calendar month for `monthlyMonths` months. */
   monthlyMonths: number;
+  /** Absolute backstop: never keep more than `maxFiles` backups. Defaults to 200 when omitted. */
+  maxFiles?: number;
 };
+
+const DEFAULT_HOURLY_HOURS = 48;
+const DEFAULT_MAX_FILES = 200;
 
 export type RunDatabaseBackupOptions = {
   connectionString: string;
@@ -103,24 +113,43 @@ function isoWeekKey(date: Date): string {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /**
- * Tiered backup pruning:
- * - Daily tier: keep ALL backups from the last `dailyDays` days
- * - Weekly tier: keep the NEWEST backup per calendar week for `weeklyWeeks` weeks
- * - Monthly tier: keep the NEWEST backup per calendar month for `monthlyMonths` months
- * - Everything else is deleted
+ * Tiered backup pruning. Tiers are evaluated oldest-applicable-first; a backup
+ * is kept if it is the survivor of its tier's bucket:
+ * - Hourly tier: keep ALL backups within the last `hourlyHours` hours (default 48).
+ *   This is what bounds an hourly backup cadence — see {@link BackupRetentionPolicy}.
+ * - Daily tier: keep the NEWEST backup per calendar day for `dailyDays` days.
+ * - Weekly tier: keep the NEWEST backup per calendar week for `weeklyWeeks` weeks.
+ * - Monthly tier: keep the NEWEST backup per calendar month for `monthlyMonths` months.
+ * - Everything older than all tiers is deleted.
+ * - Absolute backstop: after tier rules, never keep more than `maxFiles` (default 200);
+ *   the oldest survivors beyond that count are pruned regardless of tier.
+ *
+ * Exported for direct unit testing without a running database.
  */
-function pruneOldBackups(backupDir: string, retention: BackupRetentionPolicy, filenamePrefix: string): number {
+export function pruneOldBackups(
+  backupDir: string,
+  retention: BackupRetentionPolicy,
+  filenamePrefix: string,
+): number {
   if (!existsSync(backupDir)) return 0;
 
   const now = Date.now();
-  const dailyCutoff = now - Math.max(1, retention.dailyDays) * 24 * 60 * 60 * 1000;
-  const weeklyCutoff = now - Math.max(1, retention.weeklyWeeks) * 7 * 24 * 60 * 60 * 1000;
-  const monthlyCutoff = now - Math.max(1, retention.monthlyMonths) * 30 * 24 * 60 * 60 * 1000;
+  const day = 24 * 60 * 60 * 1000;
+  const hourlyHours = Math.max(1, retention.hourlyHours ?? DEFAULT_HOURLY_HOURS);
+  const maxFiles = Math.max(1, retention.maxFiles ?? DEFAULT_MAX_FILES);
+  const hourlyCutoff = now - hourlyHours * 60 * 60 * 1000;
+  const dailyCutoff = now - Math.max(1, retention.dailyDays) * day;
+  const weeklyCutoff = now - Math.max(1, retention.weeklyWeeks) * 7 * day;
+  const monthlyCutoff = now - Math.max(1, retention.monthlyMonths) * 30 * day;
 
   type BackupEntry = { name: string; fullPath: string; mtimeMs: number };
   const entries: BackupEntry[] = [];
@@ -133,50 +162,76 @@ function pruneOldBackups(backupDir: string, retention: BackupRetentionPolicy, fi
     entries.push({ name, fullPath, mtimeMs: stat.mtimeMs });
   }
 
-  // Sort newest first so the first entry per week/month bucket is the one we keep
+  // Sort newest first so the first entry per day/week/month bucket is the one we keep.
   entries.sort((a, b) => b.mtimeMs - a.mtimeMs);
 
+  const keepDayBuckets = new Set<string>();
   const keepWeekBuckets = new Set<string>();
   const keepMonthBuckets = new Set<string>();
-  const toDelete: string[] = [];
+  const toDelete = new Set<string>();
+  const kept: BackupEntry[] = [];
 
   for (const entry of entries) {
-    // Daily tier — keep everything within dailyDays
-    if (entry.mtimeMs >= dailyCutoff) continue;
+    // Hourly tier — keep everything within hourlyHours.
+    if (entry.mtimeMs >= hourlyCutoff) {
+      kept.push(entry);
+      continue;
+    }
 
     const date = new Date(entry.mtimeMs);
-    const week = isoWeekKey(date);
-    const month = monthKey(date);
 
-    // Weekly tier — keep newest per calendar week
+    // Daily tier — keep newest per calendar day.
+    if (entry.mtimeMs >= dailyCutoff) {
+      const dayBucket = dayKey(date);
+      if (keepDayBuckets.has(dayBucket)) {
+        toDelete.add(entry.fullPath);
+      } else {
+        keepDayBuckets.add(dayBucket);
+        kept.push(entry);
+      }
+      continue;
+    }
+
+    // Weekly tier — keep newest per calendar week.
     if (entry.mtimeMs >= weeklyCutoff) {
+      const week = isoWeekKey(date);
       if (keepWeekBuckets.has(week)) {
-        toDelete.push(entry.fullPath);
+        toDelete.add(entry.fullPath);
       } else {
         keepWeekBuckets.add(week);
+        kept.push(entry);
       }
       continue;
     }
 
-    // Monthly tier — keep newest per calendar month
+    // Monthly tier — keep newest per calendar month.
     if (entry.mtimeMs >= monthlyCutoff) {
+      const month = monthKey(date);
       if (keepMonthBuckets.has(month)) {
-        toDelete.push(entry.fullPath);
+        toDelete.add(entry.fullPath);
       } else {
         keepMonthBuckets.add(month);
+        kept.push(entry);
       }
       continue;
     }
 
-    // Beyond all retention tiers — delete
-    toDelete.push(entry.fullPath);
+    // Beyond all retention tiers — delete.
+    toDelete.add(entry.fullPath);
+  }
+
+  // Absolute backstop — `kept` is already newest-first; drop the oldest over the cap.
+  if (kept.length > maxFiles) {
+    for (const entry of kept.slice(maxFiles)) {
+      toDelete.add(entry.fullPath);
+    }
   }
 
   for (const filePath of toDelete) {
     unlinkSync(filePath);
   }
 
-  return toDelete.length;
+  return toDelete.size;
 }
 
 function formatBackupSize(sizeBytes: number): string {

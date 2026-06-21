@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PatchInstanceGeneralSettings, BackupRetentionPolicy } from "@paperclipai/shared";
 import {
+  HOURLY_RETENTION_PRESETS,
   DAILY_RETENTION_PRESETS,
   WEEKLY_RETENTION_PRESETS,
   MONTHLY_RETENTION_PRESETS,
+  MAX_FILES_PRESETS,
   DEFAULT_BACKUP_RETENTION,
 } from "@paperclipai/shared";
 import { LogOut, SlidersHorizontal } from "lucide-react";
@@ -177,9 +179,39 @@ export function InstanceGeneralSettings() {
             <h2 className="text-sm font-semibold">Backup retention</h2>
             <p className="max-w-2xl text-sm text-muted-foreground">
               Configure how long automatic database backups are retained. Backups run roughly
-              every hour and are compressed with gzip. Within the daily window all backups are
-              kept; beyond that, one backup per week and one per month are preserved.
+              every hour and are compressed with gzip. Within the hourly window every backup is
+              kept; beyond that, one backup per day, then one per week, then one per month are
+              preserved. A hard file cap is enforced as a backstop.
             </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hourly</h3>
+            <div className="flex flex-wrap gap-2">
+              {HOURLY_RETENTION_PRESETS.map((hours) => {
+                const active = backupRetention.hourlyHours === hours;
+                return (
+                  <button
+                    key={hours}
+                    type="button"
+                    disabled={updateGeneralMutation.isPending}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                      active
+                        ? "border-foreground bg-accent text-foreground"
+                        : "border-border bg-background hover:bg-accent/50",
+                    )}
+                    onClick={() =>
+                      updateGeneralMutation.mutate({
+                        backupRetention: { ...backupRetention, hourlyHours: hours },
+                      })
+                    }
+                  >
+                    <div className="text-sm font-medium">{hours} hours</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -265,6 +297,37 @@ export function InstanceGeneralSettings() {
                     }
                   >
                     <div className="text-sm font-medium">{label}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Max files (backstop)
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {MAX_FILES_PRESETS.map((max) => {
+                const active = backupRetention.maxFiles === max;
+                return (
+                  <button
+                    key={max}
+                    type="button"
+                    disabled={updateGeneralMutation.isPending}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                      active
+                        ? "border-foreground bg-accent text-foreground"
+                        : "border-border bg-background hover:bg-accent/50",
+                    )}
+                    onClick={() =>
+                      updateGeneralMutation.mutate({
+                        backupRetention: { ...backupRetention, maxFiles: max },
+                      })
+                    }
+                  >
+                    <div className="text-sm font-medium">{max} files</div>
                   </button>
                 );
               })}

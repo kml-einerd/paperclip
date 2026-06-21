@@ -15,6 +15,9 @@ import {
   inspectMigrations,
   applyPendingMigrations,
   createEmbeddedPostgresLogBuffer,
+  resolveEmbeddedPostgresBinPath,
+  cleanStopEmbeddedPostgres,
+  cleanupOrphanSharedMemoryOnStart,
   reconcilePendingMigrationHistory,
   formatDatabaseBackupResult,
   runDatabaseBackup,
@@ -405,6 +408,23 @@ export async function startServer(): Promise<StartedServer> {
         }
 
         if (existsSync(postmasterPidFile)) {
+          // No live postmaster owns this data dir (checked above via getRunningPid),
+          // but a stale postmaster.pid means the previous shutdown was dirty. Free any
+          // orphan System V shared-memory segment it left behind BEFORE removing the
+          // pid file (cleanup reads the shmem key/id from line 7). Otherwise the next
+          // start can FATAL with "pre-existing shared memory block ... is still in use"
+          // and retry-loop until the OS reclaims it (NOV-1293, ~17 min outage).
+          try {
+            const cleaned = await cleanupOrphanSharedMemoryOnStart(dataDir);
+            if (cleaned) {
+              logger.warn(
+                { shmemKey: cleaned.key, shmemId: cleaned.id },
+                "Removed orphan PostgreSQL shared-memory segment left by a dirty shutdown",
+              );
+            }
+          } catch (err) {
+            logger.warn({ err }, "Orphan shared-memory cleanup failed; continuing to start");
+          }
           logger.warn("Removing stale embedded PostgreSQL lock file");
           rmSync(postmasterPidFile, { force: true });
         }
@@ -880,10 +900,37 @@ export async function startServer(): Promise<StartedServer> {
 
       if (embeddedPostgres && embeddedPostgresStartedByThisProcess) {
         logger.info({ signal }, "Stopping embedded PostgreSQL");
-        try {
-          await embeddedPostgres?.stop();
-        } catch (err) {
-          logger.error({ err }, "Failed to stop embedded PostgreSQL cleanly");
+        // Prefer `pg_ctl stop -m fast -w`: it blocks until the postmaster has fully
+        // exited and detached its shared-memory segment, so the next boot cannot hit a
+        // "pre-existing shared memory block ... is still in use" FATAL (NOV-1293). The
+        // library `.stop()` only sends SIGINT and resolves on the wrapper exit, which
+        // can race `process.exit(0)` and orphan the segment. Fall back to it if pg_ctl
+        // is unavailable.
+        let stoppedCleanly = false;
+        const pgCtlPath =
+          startupDbInfo?.mode === "embedded-postgres"
+            ? resolveEmbeddedPostgresBinPath("pg_ctl")
+            : null;
+        if (pgCtlPath && startupDbInfo?.mode === "embedded-postgres") {
+          try {
+            const result = await cleanStopEmbeddedPostgres(pgCtlPath, startupDbInfo.dataDir);
+            stoppedCleanly = result.ok;
+            if (!result.ok) {
+              logger.warn(
+                { stderr: result.stderr },
+                "pg_ctl fast stop did not complete cleanly; falling back to library stop",
+              );
+            }
+          } catch (err) {
+            logger.warn({ err }, "pg_ctl fast stop threw; falling back to library stop");
+          }
+        }
+        if (!stoppedCleanly) {
+          try {
+            await embeddedPostgres?.stop();
+          } catch (err) {
+            logger.error({ err }, "Failed to stop embedded PostgreSQL cleanly");
+          }
         }
       }
 
