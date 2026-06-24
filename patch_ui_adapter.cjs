@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const pmosGatewayDir = '/home/agdis/Desktop/nova-era-work/nova-era/paperclip/ui/src/adapters/pmos-gateway';
+const pmosGatewayDir = '/home/agdev/Desktop/nova-era-work/nova-era/paperclip/ui/src/adapters/pmos-gateway';
 const indexTs = path.join(pmosGatewayDir, 'index.ts');
 const configFieldsTsx = path.join(pmosGatewayDir, 'config-fields.tsx');
 
@@ -20,7 +20,7 @@ replaceInFile(indexTs);
 replaceInFile(configFieldsTsx);
 
 // Now patch ui/src/adapters/registry.ts
-const registryTs = '/home/agdis/Desktop/nova-era-work/nova-era/paperclip/ui/src/adapters/registry.ts';
+const registryTs = '/home/agdev/Desktop/nova-era-work/nova-era/paperclip/ui/src/adapters/registry.ts';
 let registryContent = fs.readFileSync(registryTs, 'utf8');
 
 const importStatement = 'import { pmosGatewayUIAdapter } from "./pmos-gateway";';

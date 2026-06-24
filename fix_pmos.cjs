@@ -19,7 +19,7 @@ function walk(dir) {
     return results;
 }
 
-const pmosDir = '/home/agdis/Desktop/nova-era-work/nova-era/paperclip/packages/adapters/pmos-gateway';
+const pmosDir = '/home/agdev/Desktop/nova-era-work/nova-era/paperclip/packages/adapters/pmos-gateway';
 const files = walk(pmosDir);
 
 files.forEach(f => {

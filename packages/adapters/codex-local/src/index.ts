@@ -9,6 +9,10 @@ export const DEFAULT_CODEX_LOCAL_MODEL = "gpt-5.3-codex";
 export const DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX = true;
 export const CODEX_LOCAL_FAST_MODE_SUPPORTED_MODELS = ["gpt-5.4"] as const;
 
+const LEGACY_MODEL_ALIASES: Record<string, string> = {
+  "codex-mini-latest": DEFAULT_CODEX_LOCAL_MODEL,
+};
+
 function normalizeModelId(model: string | null | undefined): string {
   return typeof model === "string" ? model.trim() : "";
 }
@@ -19,9 +23,14 @@ export function isCodexLocalKnownModel(model: string | null | undefined): boolea
   return models.some((entry) => entry.id === normalizedModel);
 }
 
-export function isCodexLocalManualModel(model: string | null | undefined): boolean {
+export function resolveCodexLocalModel(model: string | null | undefined): string {
   const normalizedModel = normalizeModelId(model);
-  return Boolean(normalizedModel) && !isCodexLocalKnownModel(normalizedModel);
+  return normalizedModel ? LEGACY_MODEL_ALIASES[normalizedModel] || normalizedModel : "";
+}
+
+export function isCodexLocalManualModel(model: string | null | undefined): boolean {
+  const resolvedModel = resolveCodexLocalModel(model);
+  return Boolean(resolvedModel) && !isCodexLocalKnownModel(resolvedModel);
 }
 
 export function isCodexLocalFastModeSupported(model: string | null | undefined): boolean {

@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const registryTs = '/home/agdis/Desktop/nova-era-work/nova-era/paperclip/cli/src/adapters/registry.ts';
+const registryTs = '/home/agdev/Desktop/nova-era-work/nova-era/paperclip/cli/src/adapters/registry.ts';
 let registryContent = fs.readFileSync(registryTs, 'utf8');
 
 const importStatement = 'import { printPmosGatewayStreamEvent } from "@paperclipai/adapter-pmos-gateway/cli";';

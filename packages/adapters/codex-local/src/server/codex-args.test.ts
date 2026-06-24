@@ -67,4 +67,20 @@ describe("buildCodexExecArgs", () => {
       "-",
     ]);
   });
+
+  it("maps legacy codex-mini-latest model", () => {
+    const result = buildCodexExecArgs({
+      model: "codex-mini-latest",
+      fastMode: false,
+    });
+
+    expect(result.model).toBe("gpt-5.3-codex");
+    expect(result.args).toEqual([
+      "exec",
+      "--json",
+      "--model",
+      "gpt-5.3-codex",
+      "-",
+    ]);
+  });
 });

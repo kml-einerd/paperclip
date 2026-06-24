@@ -1,6 +1,7 @@
 import { asBoolean, asString, asStringArray } from "@paperclipai/adapter-utils/server-utils";
 import {
   CODEX_LOCAL_FAST_MODE_SUPPORTED_MODELS,
+  resolveCodexLocalModel,
   isCodexLocalFastModeSupported,
 } from "../index.js";
 
@@ -33,7 +34,7 @@ export function buildCodexExecArgs(
   options: { resumeSessionId?: string | null } = {},
 ): BuildCodexExecArgsResult {
   const record = asRecord(config);
-  const model = asString(record.model, "").trim();
+  const model = resolveCodexLocalModel(asString(record.model, ""));
   const modelReasoningEffort = asString(
     record.modelReasoningEffort,
     asString(record.reasoningEffort, ""),

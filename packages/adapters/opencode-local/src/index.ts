@@ -5,7 +5,7 @@ export const label = "OpenCode (local)";
 
 export const SANDBOX_INSTALL_COMMAND = "npm install -g opencode-ai";
 
-export const DEFAULT_OPENCODE_LOCAL_MODEL = "openai/gpt-5.2-codex";
+export const DEFAULT_OPENCODE_LOCAL_MODEL = "openrouter/openai/gpt-5.2-codex";
 
 export function isValidOpenCodeModelId(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -16,19 +16,19 @@ export function isValidOpenCodeModelId(value: unknown): value is string {
 
 export const models: Array<{ id: string; label: string }> = [
   { id: DEFAULT_OPENCODE_LOCAL_MODEL, label: DEFAULT_OPENCODE_LOCAL_MODEL },
-  { id: "openai/gpt-5.4", label: "openai/gpt-5.4" },
-  { id: "openai/gpt-5.2", label: "openai/gpt-5.2" },
-  { id: "openai/gpt-5.1-codex-max", label: "openai/gpt-5.1-codex-max" },
-  { id: "openai/gpt-5.1-codex-mini", label: "openai/gpt-5.1-codex-mini" },
+  { id: "openrouter/openai/gpt-5.4", label: "openrouter/openai/gpt-5.4" },
+  { id: "openrouter/openai/gpt-5.2", label: "openrouter/openai/gpt-5.2" },
+  { id: "openrouter/openai/gpt-5.1-codex-max", label: "openrouter/openai/gpt-5.1-codex-max" },
+  { id: "openrouter/openai/gpt-5.1-codex-mini", label: "openrouter/openai/gpt-5.1-codex-mini" },
 ];
 
 export const modelProfiles: AdapterModelProfileDefinition[] = [
   {
     key: "cheap",
     label: "Cheap",
-    description: "Use OpenCode's known Codex mini model as the budget lane.",
+    description: "Use OpenRouter's known Codex mini model as the budget lane.",
     adapterConfig: {
-      model: "openai/gpt-5.1-codex-mini",
+      model: "openrouter/openai/gpt-5.1-codex-mini",
       variant: "low",
     },
     source: "adapter_default",

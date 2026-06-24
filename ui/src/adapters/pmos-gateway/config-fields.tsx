@@ -85,7 +85,7 @@ export function PmosGatewayConfigFields({
             ? set!({ apiKey: v })
             : mark("adapterConfig", "apiKey", v || undefined)
         }
-        placeholder="pmos_test_key_2024"
+        placeholder="pmos_local_dev_key"
       />
 
       {!isCreate && (

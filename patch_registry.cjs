@@ -1,5 +1,5 @@
 const fs = require('fs');
-const file = '/home/agdis/Desktop/nova-era-work/nova-era/paperclip/server/src/adapters/registry.ts';
+const file = '/home/agdev/Desktop/nova-era-work/nova-era/paperclip/server/src/adapters/registry.ts';
 let code = fs.readFileSync(file, 'utf8');
 
 const importStatement = `

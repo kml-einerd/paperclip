@@ -495,11 +495,27 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     ),
   );
   const billingType = resolveCodexBillingType(effectiveEnv);
+  const resolvedBiller = resolveCodexBiller(effectiveEnv, billingType);
+  const configuredModel = asString(config.model, "").trim();
+  const modelCompatibilityAdjusted =
+    resolvedBiller === "chatgpt" && configuredModel === "codex-mini-latest";
+  const modelCompatibilityAdjustmentNote = modelCompatibilityAdjusted
+    ? "Model fallback for ChatGPT billing compatibility: codex-mini-latest -> gpt-5.3-codex."
+    : null;
   const runtimeEnv = Object.fromEntries(
     Object.entries(ensurePathInEnv(effectiveEnv)).filter(
       (entry): entry is [string, string] => typeof entry[1] === "string",
     ),
   );
+  const compatibilityAdjustedConfig = (() => {
+    if (modelCompatibilityAdjusted) {
+      return {
+        ...config,
+        model: "gpt-5.3-codex",
+      };
+    }
+    return config;
+  })();
   await ensureAdapterExecutionTargetRuntimeCommandInstalled({
     runId,
     target: executionTarget,
@@ -598,6 +614,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const commandNotes = (() => {
     if (!instructionsFilePath) {
       const notes = [repoAgentsNote];
+      if (modelCompatibilityAdjustmentNote) {
+        notes.push(modelCompatibilityAdjustmentNote);
+      }
       if (forceSaferInvocation) {
         notes.push("Codex transient fallback requested safer invocation settings for this retry.");
       }
@@ -613,6 +632,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
           "Skipped stdin instruction reinjection because an existing Codex session is being resumed with a wake delta.",
           repoAgentsNote,
         ];
+        if (modelCompatibilityAdjustmentNote) {
+          notes.push(modelCompatibilityAdjustmentNote);
+        }
         if (forceSaferInvocation) {
           notes.push("Codex transient fallback requested safer invocation settings for this retry.");
         }
@@ -626,6 +648,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         `Prepended instructions + path directive to stdin prompt (relative references from ${instructionsDir}).`,
         repoAgentsNote,
       ];
+      if (modelCompatibilityAdjustmentNote) {
+        notes.push(modelCompatibilityAdjustmentNote);
+      }
       if (forceSaferInvocation) {
         notes.push("Codex transient fallback requested safer invocation settings for this retry.");
       }
@@ -638,6 +663,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       `Configured instructionsFilePath ${instructionsFilePath}, but file could not be read; continuing without injected instructions.`,
       repoAgentsNote,
     ];
+    if (modelCompatibilityAdjustmentNote) {
+      notes.push(modelCompatibilityAdjustmentNote);
+    }
     if (forceSaferInvocation) {
       notes.push("Codex transient fallback requested safer invocation settings for this retry.");
     }
@@ -667,7 +695,9 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
 
   const runAttempt = async (resumeSessionId: string | null) => {
     const execArgs = buildCodexExecArgs(
-      forceSaferInvocation ? { ...config, fastMode: false } : config,
+      forceSaferInvocation
+        ? { ...compatibilityAdjustedConfig, fastMode: false }
+        : compatibilityAdjustedConfig,
       { resumeSessionId },
     );
     const args = execArgs.args;
