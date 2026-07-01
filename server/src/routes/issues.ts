@@ -176,6 +176,15 @@ function buildCreateIssueActivityStatusDetails(
   };
 }
 
+function getUnresolvedBlockerIssueIds(details: unknown): string[] | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const value = (details as { unresolvedBlockerIssueIds?: unknown }).unresolvedBlockerIssueIds;
+  if (!Array.isArray(value) || value.length === 0 || !value.every((item) => typeof item === "string")) {
+    return null;
+  }
+  return value;
+}
+
 const SUCCESSFUL_RUN_HANDOFF_ACTIONS = [
   "issue.successful_run_handoff_required",
   "issue.successful_run_handoff_resolved",
@@ -2796,15 +2805,15 @@ export function issueRoutes(
         // issue that has unresolved first-class blockers, converge the state server-side
         // instead of letting the caller loop. Move the issue to `blocked` and respond
         // with 200 so the caller stops retrying (a 422 loop is non-actionable for agents).
+        const unresolvedBlockerIssueIds = getUnresolvedBlockerIssueIds(err.details);
         if (
           err.message === "Issue is blocked by unresolved blockers" &&
           req.body.status === "in_progress" &&
-          Array.isArray(err.details?.unresolvedBlockerIssueIds) &&
-          (err.details.unresolvedBlockerIssueIds as string[]).length > 0
+          unresolvedBlockerIssueIds
         ) {
           const autoBlocked = await svc.update(id, {
             status: "blocked",
-            blockedByIssueIds: err.details.unresolvedBlockerIssueIds as string[],
+            blockedByIssueIds: unresolvedBlockerIssueIds,
             actorAgentId: actor.agentId ?? null,
             actorUserId: actor.actorType === "user" ? actor.actorId : null,
           });
@@ -2813,7 +2822,7 @@ export function issueRoutes(
               {
                 issueId: id,
                 companyId: existing.companyId,
-                unresolvedBlockerIssueIds: err.details.unresolvedBlockerIssueIds,
+                unresolvedBlockerIssueIds,
               },
               "auto-blocked issue after repeated in_progress 422 — caller was retrying blindly",
             );
@@ -3503,35 +3512,36 @@ export function issueRoutes(
       // Auto-block on checkout: when checkout is rejected because the issue has
       // unresolved first-class blockers, converge the state server-side so the
       // caller stops retrying on the next heartbeat wake.
-      if (
-        err instanceof HttpError &&
-        err.status === 422 &&
-        err.message === "Issue is blocked by unresolved blockers" &&
-        Array.isArray(err.details?.unresolvedBlockerIssueIds) &&
-        (err.details.unresolvedBlockerIssueIds as string[]).length > 0
-      ) {
-        const autoBlocked = await svc.update(issue.id, {
-          status: "blocked",
-          blockedByIssueIds: err.details.unresolvedBlockerIssueIds as string[],
-          actorAgentId: null,
-          actorUserId: null,
-        });
-        if (autoBlocked) {
-          logger.warn(
-            {
-              issueId: issue.id,
-              companyId: issue.companyId,
-              agentId: req.body.agentId,
-              unresolvedBlockerIssueIds: err.details.unresolvedBlockerIssueIds,
-            },
-            "auto-blocked issue on checkout — issue had unresolved blockers preventing in_progress transition",
-          );
-          res.status(409).json({
-            error: "Issue is blocked by unresolved blockers",
-            blockedByIssueIds: err.details.unresolvedBlockerIssueIds,
-            issue: autoBlocked,
+      if (err instanceof HttpError) {
+        const unresolvedBlockerIssueIds = getUnresolvedBlockerIssueIds(err.details);
+        if (
+          err.status === 422 &&
+          err.message === "Issue is blocked by unresolved blockers" &&
+          unresolvedBlockerIssueIds
+        ) {
+          const autoBlocked = await svc.update(issue.id, {
+            status: "blocked",
+            blockedByIssueIds: unresolvedBlockerIssueIds,
+            actorAgentId: null,
+            actorUserId: null,
           });
-          return;
+          if (autoBlocked) {
+            logger.warn(
+              {
+                issueId: issue.id,
+                companyId: issue.companyId,
+                agentId: req.body.agentId,
+                unresolvedBlockerIssueIds,
+              },
+              "auto-blocked issue on checkout — issue had unresolved blockers preventing in_progress transition",
+            );
+            res.status(409).json({
+              error: "Issue is blocked by unresolved blockers",
+              blockedByIssueIds: unresolvedBlockerIssueIds,
+              issue: autoBlocked,
+            });
+            return;
+          }
         }
       }
       throw err;

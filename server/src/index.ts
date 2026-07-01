@@ -6,7 +6,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { pathToFileURL } from "node:url";
 import type { Request as ExpressRequest, RequestHandler } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   createDb,
   ensurePostgresDatabase,
@@ -462,6 +462,18 @@ export async function startServer(): Promise<StartedServer> {
     activeDatabaseConnectionString = embeddedConnectionString;
     resolvedEmbeddedPostgresPort = port;
     startupDbInfo = { mode: "embedded-postgres", dataDir, port };
+  }
+
+  // Fix Agent CWD paths if pointing to legacy user agdis (NOV-508)
+  try {
+    await db.execute(sql`
+      UPDATE agents
+      SET adapter_config = jsonb_set(adapter_config, '{cwd}', '"/home/agdev"')
+      WHERE adapter_config->>'cwd' LIKE '/home/agdis%'
+    `);
+    logger.info("Checked and updated agent config.cwd paths from legacy /home/agdis to /home/agdev");
+  } catch (err) {
+    logger.error({ err }, "Failed to update agent config.cwd paths");
   }
   
   if (config.deploymentMode === "local_trusted" && !isLoopbackHost(config.host)) {
