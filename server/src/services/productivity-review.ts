@@ -9,6 +9,7 @@ import {
   issueComments,
   issues,
   projects,
+  routineTriggers,
 } from "@paperclipai/db";
 import { logger } from "../middleware/logger.js";
 import { logActivity } from "./activity-log.js";
@@ -239,6 +240,23 @@ export function productivityReviewService(db: Db, deps?: { enqueueWakeup?: Enque
       depth += 1;
     }
     return false;
+  }
+
+  async function isScheduledRoutineExecutionIssue(issue: Pick<IssueRow, "companyId" | "originKind" | "originId">) {
+    if (issue.originKind !== "routine_execution" || !issue.originId) return false;
+    return db
+      .select({ id: routineTriggers.id })
+      .from(routineTriggers)
+      .where(
+        and(
+          eq(routineTriggers.companyId, issue.companyId),
+          eq(routineTriggers.routineId, issue.originId),
+          eq(routineTriggers.kind, "schedule"),
+          eq(routineTriggers.enabled, true),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows.length > 0);
   }
 
   async function findOpenProductivityReview(companyId: string, sourceIssueId: string) {
@@ -801,6 +819,10 @@ export function productivityReviewService(db: Db, deps?: { enqueueWakeup?: Enque
         continue;
       }
       if (await isProductivityReviewDescendant(candidate)) {
+        result.skipped += 1;
+        continue;
+      }
+      if (await isScheduledRoutineExecutionIssue(candidate)) {
         result.skipped += 1;
         continue;
       }
